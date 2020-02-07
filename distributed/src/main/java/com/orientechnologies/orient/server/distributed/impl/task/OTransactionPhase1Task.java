@@ -118,7 +118,7 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
     //No need to increase the lock timeout here with the retry because this retries are not deadlock retries
     OTransactionResultPayload res1;
     try {
-      res1 = executeTransaction(requestId, (ODatabaseDocumentDistributed) database, tx, false, retryCount);
+      res1 = executeTransaction(requestId, transactionId, (ODatabaseDocumentDistributed) database, tx, false, retryCount);
     } catch (Exception e) {
       this.finished = true;
       if (this.notYetFinishedTask != null) {
@@ -147,11 +147,11 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
     return hasResponse;
   }
 
-  public static OTransactionResultPayload executeTransaction(ODistributedRequestId requestId, ODatabaseDocumentDistributed database,
-      OTransactionInternal tx, boolean local, int retryCount) {
+  public static OTransactionResultPayload executeTransaction(ODistributedRequestId requestId, OTransactionId id,
+      ODatabaseDocumentDistributed database, OTransactionInternal tx, boolean local, int retryCount) {
     OTransactionResultPayload payload;
     try {
-      if (database.beginDistributedTx(requestId, tx, local, retryCount)) {
+      if (database.beginDistributedTx(requestId, id, tx, local, retryCount)) {
         payload = new OTxSuccess();
       } else {
         return null;
@@ -174,7 +174,7 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
 
   @Override
   public void fromStream(DataInput in, ORemoteTaskFactory factory) throws IOException {
-
+    this.transactionId = OTransactionId.read(in);
     int size = in.readInt();
     for (int i = 0; i < size; i++) {
       ORecordOperationRequest req = OMessageHelper.readTransactionEntry(in);
@@ -235,6 +235,7 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
 
   @Override
   public void toStream(DataOutput out) throws IOException {
+    transactionId.write(out);
     out.writeInt(operations.size());
 
     for (ORecordOperationRequest operation : operations) {
@@ -252,7 +253,8 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
     return FACTORYID;
   }
 
-  public void init(OTransactionInternal operations) {
+  public void init(OTransactionId transactionId, OTransactionInternal operations) {
+    this.transactionId = transactionId;
     for (Map.Entry<String, OTransactionIndexChanges> indexOp : operations.getIndexOperations().entrySet()) {
       final ODatabaseDocumentInternal database = operations.getDatabase();
       if (indexOp.getValue().resolveAssociatedIndex(indexOp.getKey(), database.getMetadata().getIndexManagerInternal(), database)
@@ -327,5 +329,9 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
     if (notYetFinishedTask != null) {
       notYetFinishedTask.cancel();
     }
+  }
+  
+  public OTransactionId getTransactionId() {
+    return transactionId;
   }
 }
