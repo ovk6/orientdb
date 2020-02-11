@@ -215,10 +215,9 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
           record = database.load(req.getId());
           ODocumentSerializerDelta.instance().deserializeDelta(req.getRecord(), (ODocument) record);
           /// Got record with empty deltas, at this level we mark the record dirty anyway.
-          if (record.isDirty()) {
-            ODocumentSerializerDelta.instance().deserializeDelta(req.getRecord(), (ODocument) record);
+          if (record != null) {
+            record.setDirty();
           }
-          record.setDirty();
         } else {
           record = ORecordSerializerNetworkDistributed.INSTANCE.fromStream(req.getRecord(), null);
           ORecordInternal.setRecordSerializer(record, database.getSerializer());
@@ -234,8 +233,10 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
         break;
       }
       }
-      ORecordInternal.setIdentity(record, (ORecordId) req.getId());
-      ORecordInternal.setVersion(record, req.getVersion());
+      if (record != null) {
+        ORecordInternal.setIdentity(record, (ORecordId) req.getId());
+        ORecordInternal.setVersion(record, req.getVersion());
+      }
       ORecordOperation op = new ORecordOperation(record, type);
       ops.add(op);
     }
