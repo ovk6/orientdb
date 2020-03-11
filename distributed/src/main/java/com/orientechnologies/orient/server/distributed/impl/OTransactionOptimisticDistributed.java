@@ -16,14 +16,16 @@ import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
 import com.orientechnologies.orient.core.schedule.OScheduledEvent;
 import com.orientechnologies.orient.core.tx.OTransactionOptimistic;
+import com.orientechnologies.orient.server.distributed.ODistributedCommitToken;
 
 import java.util.*;
 
 public class OTransactionOptimisticDistributed extends OTransactionOptimistic {
-  private final Map<ORID, ORecord>     createdRecords = new HashMap<>();
-  private final Map<ORID, ORecord>     updatedRecords = new HashMap<>();
-  private final Set<ORID>              deletedRecord  = new HashSet<>();
-  private       List<ORecordOperation> changes;
+  private final Map<ORID, ORecord>                createdRecords = new HashMap<>();
+  private final Map<ORID, ORecord>                updatedRecords = new HashMap<>();
+  private final Set<ORID>                         deletedRecord  = new HashSet<>();
+  private       List<ORecordOperation>            changes;
+  private       Optional<ODistributedCommitToken> token          = Optional.empty();
 
   public OTransactionOptimisticDistributed(ODatabaseDocumentInternal database, List<ORecordOperation> changes) {
     super(database);
@@ -153,5 +155,21 @@ public class OTransactionOptimisticDistributed extends OTransactionOptimistic {
 
   public void setDatabase(ODatabaseDocumentInternal database) {
     this.database = database;
+  }
+
+  public void setCommitToken(ODistributedCommitToken token) {
+    this.token = Optional.of(token);
+  }
+
+  @Override
+  public Optional<byte[]> getMetadata() {
+    return token.map((t) -> t.token());
+  }
+
+  @Override
+  public void storageBegun() {
+    if (token.isPresent()) {
+      token.get().notifyDone();
+    }
   }
 }

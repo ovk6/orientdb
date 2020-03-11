@@ -96,8 +96,13 @@ public class ONewDistributedTxContextImpl implements ODistributedTxContext {
   public synchronized void commit(ODatabaseDocumentInternal database) {
     ODistributedDatabase localDistributedDatabase = ((ODatabaseDocumentDistributed) database).getStorageDistributed()
         .getLocalDistributedDatabase();
-    localDistributedDatabase.commit(getTransactionId());
-    ((ODatabaseDocumentDistributed) database).internalCommit2pc(this);
+    ODistributedCommitToken token = localDistributedDatabase.commit(getTransactionId());
+    try {
+      ((OTransactionOptimisticDistributed) database.getTransaction()).setCommitToken(token);
+      ((ODatabaseDocumentDistributed) database).internalCommit2pc(this);
+    } finally {
+      token.notifyDone();
+    }
   }
 
   @Override

@@ -116,7 +116,7 @@ public interface ODistributedDatabase {
 
   void rollback(OTransactionId id);
 
-  void commit(OTransactionId id);
+  ODistributedCommitToken commit(OTransactionId id);
 
   ODistributedTxContext registerTxContext(ODistributedRequestId reqId);
 
